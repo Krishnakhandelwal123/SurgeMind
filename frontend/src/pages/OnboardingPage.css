@@ -1,0 +1,19 @@
+.onboard { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 32px; }
+.onboard-card { max-width: 520px; width: 100%; text-align: center; }
+.dots { display: flex; gap: 8px; justify-content: center; margin-bottom: 32px; }
+.dots span { width: 10px; height: 10px; border-radius: 50%; background: var(--surface-3); }
+.dots span.filled { background: var(--purple); }
+.onboard-icon { font-size: 48px; margin-bottom: 16px; }
+.onboard-icon.glow { box-shadow: 0 0 40px #7C6EFA44; border-radius: 50%; width: 80px; height: 80px; display: inline-flex; align-items: center; justify-content: center; }
+.muted { color: var(--text-muted); }
+.type-grid, .lang-grid { display: grid; gap: 12px; margin-top: 24px; text-align: left; }
+.type-grid { grid-template-columns: repeat(2, 1fr); }
+.lang-grid { grid-template-columns: 1fr; }
+.type-card, .lang-card {
+  padding: 16px; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius-md); cursor: pointer; color: var(--text);
+}
+.lang-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.type-card.active, .lang-card.active { border-color: var(--purple); background: rgba(124,110,250,0.1); }
+.progress-bar { height: 8px; background: var(--surface-3); border-radius: 4px; margin-top: 24px; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--purple), var(--teal)); transition: width 0.2s; }
