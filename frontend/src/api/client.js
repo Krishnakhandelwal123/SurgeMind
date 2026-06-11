@@ -21,6 +21,7 @@ export const authApi = {
   login: (data) => api.post("/api/auth/login", data),
   logout: () => api.post("/api/auth/logout"),
   me: () => api.get("/api/auth/me"),
+  session: () => api.get("/api/auth/session"),
   cities: () => api.get("/api/auth/cities"),
   onboarding: (data) => api.patch("/api/auth/onboarding", data),
   updateProfile: (data) => api.patch("/api/auth/profile", data),

@@ -9,8 +9,8 @@ export function AuthProvider({ children }) {
 
   const loadUser = useCallback(async () => {
     try {
-      const { data } = await authApi.me();
-      setUser(data.user);
+      const { data } = await authApi.session();
+      setUser(data.user || null);
     } catch {
       localStorage.removeItem("surgemind_token");
       setUser(null);

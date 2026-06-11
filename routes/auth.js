@@ -5,6 +5,7 @@ const Business = require("../db/models/Business");
 const {
   signToken,
   requireAuth,
+  tryAuth,
   setAuthCookie,
   clearAuthCookie,
 } = require("../middleware/auth");
@@ -144,6 +145,12 @@ router.post("/logout", (_req, res) => {
 router.get("/me", requireAuth, async (req, res) => {
   res.json({
     user: { ...req.user.toJSON(), business: req.business || null },
+  });
+});
+
+router.get("/session", tryAuth, async (req, res) => {
+  res.json({
+    user: req.user ? { ...req.user.toJSON(), business: req.business || null } : null,
   });
 });
 

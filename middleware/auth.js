@@ -89,9 +89,30 @@ async function requireAuth(req, res, next) {
   }
 }
 
+async function tryAuth(req, _res, next) {
+  try {
+    const token = getToken(req);
+    if (!token) return next();
+    const payload = jwt.verify(token, JWT_SECRET, {
+      issuer: "surgemind-api",
+      audience: "surgemind-web",
+    });
+    const user = await User.findById(payload.userId);
+    if (!user) return next();
+    req.user = user;
+    if (user.businessId) {
+      req.business = await Business.findById(user.businessId);
+    }
+    return next();
+  } catch {
+    return next();
+  }
+}
+
 module.exports = {
   signToken,
   requireAuth,
+  tryAuth,
   setAuthCookie,
   clearAuthCookie,
   JWT_SECRET,
