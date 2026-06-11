@@ -4,12 +4,12 @@ import { useAuth } from "../context/AuthContext";
 import "./DashboardLayout.css";
 
 const NAV = [
-  { to: "/dashboard", label: "Overview", icon: "🏠", end: true },
-  { to: "/dashboard/alerts", label: "Surge Alerts", icon: "⚡" },
-  { to: "/dashboard/calendar", label: "Match Calendar", icon: "🗓️" },
-  { to: "/dashboard/agent", label: "AI Agent", icon: "🤖" },
-  { to: "/dashboard/analytics", label: "Analytics", icon: "📊" },
-  { to: "/dashboard/settings", label: "Settings", icon: "⚙️" },
+  { to: "/dashboard", label: "Overview", icon: "OV", end: true },
+  { to: "/dashboard/alerts", label: "Surge Alerts", icon: "AL" },
+  { to: "/dashboard/calendar", label: "Match Calendar", icon: "CA" },
+  { to: "/dashboard/agent", label: "AI Agent", icon: "AI" },
+  { to: "/dashboard/analytics", label: "Analytics", icon: "AN" },
+  { to: "/dashboard/settings", label: "Settings", icon: "SE" },
 ];
 
 export default function DashboardLayout() {
@@ -19,10 +19,10 @@ export default function DashboardLayout() {
   return (
     <div className="dash-layout">
       <aside className="sidebar">
-        <div className="sidebar-brand">⚡ SurgeMind</div>
+        <div className="sidebar-brand">SurgeMind</div>
         {business && (
           <div className="sidebar-biz">
-            {business.name} · {business.city}
+            {business.name} / {business.city}
           </div>
         )}
         <nav className="sidebar-nav">
@@ -40,8 +40,8 @@ export default function DashboardLayout() {
         <div className="sidebar-footer">
           {user?.plan === "free" && (
             <div className="upgrade-card">
-              <strong>⚡ Upgrade to Pro</strong>
-              <p>3 cities · all alert types</p>
+              <strong>Upgrade to Pro</strong>
+              <p>3 cities / all alert types</p>
             </div>
           )}
           <div className="user-row">

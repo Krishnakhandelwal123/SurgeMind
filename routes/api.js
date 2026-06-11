@@ -24,7 +24,7 @@ router.get("/dashboard", async (req, res) => {
     const timeline = [];
 
     for (const city of cities) {
-      const forecast = await tools.getCrowdForecast({ city, daysAhead: 7 });
+      const forecast = await tools.getCrowdForecast({ city, daysAhead: 14 });
       totalSurge += forecast.surgeScore;
       matchCount += forecast.matchCount;
       for (const m of forecast.matches) {
@@ -50,12 +50,12 @@ router.get("/dashboard", async (req, res) => {
 
     res.json({
       citiesActive: cities.length,
-      citiesTrend: "+1 this week",
-      surgeScore: avgSurge || 8.5,
+      citiesTrend: `${matchCount} upcoming match${matchCount === 1 ? "" : "es"}`,
+      surgeScore: avgSurge,
       surgeCity: business.city,
       alertsGenerated: alerts.length,
       alertsUnread: unread,
-      revenueEstimate: revenueSum || 4200,
+      revenueEstimate: Math.round(revenueSum),
       timeline: timeline.slice(0, 8),
       activeAlerts: alerts.slice(0, 4),
       mapCities: await getMapCityData(cities),
@@ -148,7 +148,8 @@ router.post("/generate-alert", async (req, res) => {
     const result = await runAgent(
       business._id,
       targetCity,
-      language || business.language
+      language || business.language,
+      { matchId }
     );
     res.json(result);
   } catch (err) {
@@ -174,13 +175,28 @@ router.patch("/alerts/:id/checklist/:itemId", async (req, res) => {
 
 // Business settings
 router.patch("/business", async (req, res) => {
-  const allowed = ["name", "type", "city", "language", "monitoredCities"];
+  const allowed = [
+    "name",
+    "type",
+    "city",
+    "language",
+    "monitoredCities",
+    "dailyCapacity",
+    "staffCount",
+    "averageTicket",
+    "operatingHours",
+    "topProducts",
+    "alertLeadTimeDays",
+  ];
   for (const key of allowed) {
     if (req.body[key] !== undefined) req.business[key] = req.body[key];
   }
   const maxCities = req.user.plan === "pro" ? 3 : 1;
   if (req.business.monitoredCities?.length > maxCities) {
     req.business.monitoredCities = req.business.monitoredCities.slice(0, maxCities);
+  }
+  if (Array.isArray(req.business.topProducts)) {
+    req.business.topProducts = req.business.topProducts.map((item) => String(item).trim()).filter(Boolean).slice(0, 8);
   }
   await req.business.save();
   res.json(req.business);
@@ -189,41 +205,64 @@ router.patch("/business", async (req, res) => {
 // Analytics
 router.get("/analytics", async (req, res) => {
   const businessId = req.business._id;
-  const alerts = await Alert.find({ businessId }).sort({ sentAt: -1 });
+  const alerts = await Alert.find({ businessId }).populate("matchIds").sort({ sentAt: -1 });
+
+  const latestByMatch = new Map();
+  for (const alert of alerts) {
+    const primaryMatch = alert.matchIds?.[0];
+    const key = primaryMatch?._id?.toString() || alert._id.toString();
+    if (!latestByMatch.has(key)) latestByMatch.set(key, alert);
+  }
+  const uniqueAlerts = [...latestByMatch.values()];
 
   const typeCounts = {};
-  alerts.forEach((a) => {
+  uniqueAlerts.forEach((a) => {
     (a.types || []).forEach((t) => {
       typeCounts[t] = (typeCounts[t] || 0) + 1;
     });
   });
 
-  const scoreHistory = alerts.slice(0, 30).reverse().map((a) => ({
+  const scoreHistory = uniqueAlerts.slice(0, 30).reverse().map((a) => ({
     date: a.sentAt,
     score: a.surgeScore,
     label: a.matchLabel,
   }));
 
   const weeklyRevenue = {};
-  alerts.forEach((a) => {
+  uniqueAlerts.forEach((a) => {
     const week = getWeekKey(a.sentAt);
     weeklyRevenue[week] = (weeklyRevenue[week] || 0) + (a.revenueMin + a.revenueMax) / 2;
   });
 
-  const matchImpact = alerts.map((a) => ({
-    date: a.sentAt,
+  const matchImpact = uniqueAlerts.map((a) => {
+    const primaryMatch = a.matchIds?.[0];
+    return {
+    date: primaryMatch?.date || a.sentAt,
+    generatedAt: a.sentAt,
     match: a.matchLabel,
     city: a.city,
+    venue: a.venue,
     surgeScore: a.surgeScore,
-    alertsSent: 1,
+    severity: a.severity,
     estRevenue: Math.round((a.revenueMin + a.revenueMax) / 2),
-  }));
+    };
+  });
+
+  const totalOpportunity = Object.values(weeklyRevenue).reduce((s, v) => s + v, 0);
+  const avgSurge = uniqueAlerts.length
+    ? uniqueAlerts.reduce((sum, a) => sum + (a.surgeScore || 0), 0) / uniqueAlerts.length
+    : 0;
 
   res.json({
     scoreHistory,
     typeCounts,
     weeklyRevenue: Object.entries(weeklyRevenue).map(([week, revenue]) => ({ week, revenue })),
-    totalMonth: Object.values(weeklyRevenue).reduce((s, v) => s + v, 0) || 12400,
+    totalMonth: totalOpportunity,
+    totalOpportunity,
+    generatedPlans: uniqueAlerts.length,
+    rawAlertCount: alerts.length,
+    duplicatePlansIgnored: Math.max(0, alerts.length - uniqueAlerts.length),
+    avgSurge: Math.round(avgSurge * 10) / 10,
     matchImpact,
   });
 });
@@ -254,7 +293,7 @@ router.get("/agent/session", async (req, res) => {
   const cities = req.business.monitoredCities || [req.business.city];
   const monitoring = [];
   for (const city of cities) {
-    const forecast = await tools.getCrowdForecast({ city, daysAhead: 14 });
+    const forecast = await tools.getCrowdForecast({ city, daysAhead: req.business.alertLeadTimeDays || 14 });
     const next = await Match.findOne({ city: new RegExp(city, "i"), date: { $gte: new Date() } }).sort({ date: 1 });
     const daysUntil = next ? Math.ceil((next.date - Date.now()) / 86400000) : null;
     monitoring.push({ city, surgeScore: forecast.surgeScore, daysUntil, nextMatch: next });
@@ -300,7 +339,7 @@ router.post("/agent/chat", async (req, res) => {
 
     session.toolCalls.push({
       tool: "getUpcomingMatches",
-      args: `(${req.business.city}, 7d)`,
+      args: `(${req.business.city}, ${req.business.alertLeadTimeDays || 14}d)`,
       result: `returned ${result.matches.length} matches`,
     });
     session.toolCalls.push({

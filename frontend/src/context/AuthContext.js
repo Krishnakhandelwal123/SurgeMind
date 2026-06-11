@@ -8,11 +8,6 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   const loadUser = useCallback(async () => {
-    const token = localStorage.getItem("surgemind_token");
-    if (!token) {
-      setLoading(false);
-      return;
-    }
     try {
       const { data } = await authApi.me();
       setUser(data.user);
@@ -30,21 +25,25 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const { data } = await authApi.login({ email, password });
-    localStorage.setItem("surgemind_token", data.token);
+    if (data.token) localStorage.setItem("surgemind_token", data.token);
     setUser(data.user);
     return data.user;
   };
 
   const register = async (form) => {
     const { data } = await authApi.register(form);
-    localStorage.setItem("surgemind_token", data.token);
+    if (data.token) localStorage.setItem("surgemind_token", data.token);
     setUser(data.user);
     return data.user;
   };
 
-  const logout = () => {
-    localStorage.removeItem("surgemind_token");
-    setUser(null);
+  const logout = async () => {
+    try {
+      await authApi.logout();
+    } finally {
+      localStorage.removeItem("surgemind_token");
+      setUser(null);
+    }
   };
 
   const refreshUser = async () => {

@@ -15,7 +15,7 @@ export default function AgentPage() {
     agentApi.session().then((r) => {
       setSession(r.data.session);
       setMonitoring(r.data.monitoring || []);
-    });
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -57,8 +57,8 @@ export default function AgentPage() {
     <div className="agent-page grid-bg">
       <div className="page-header">
         <div>
-          <h1>🤖 SurgeMind Agent <span className="live-dot pulse" /></h1>
-          <p className="muted">Active · Monitoring {monitoring.length} cities</p>
+          <h1>SurgeMind Agent <span className="live-dot pulse" /></h1>
+          <p className="muted">Active - monitoring {monitoring.length} city{monitoring.length === 1 ? "" : "ies"}</p>
         </div>
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => agentApi.newSession().then((r) => setSession(r.data))}>
           New Session +
@@ -71,19 +71,20 @@ export default function AgentPage() {
           {business && (
             <div className="biz-mini">
               <strong>{business.name}</strong>
-              <div className="muted">{business.type} · {business.city}</div>
+              <div className="muted">{business.type} - {business.city}</div>
+              <div className="muted">{business.dailyCapacity || 0} capacity - ${business.averageTicket || 0} ticket</div>
             </div>
           )}
           <h4 className="label" style={{ marginTop: 20 }}>Active Monitoring</h4>
           {monitoring.map((m) => (
             <div key={m.city} className="monitor-row">
               <span>{m.city}</span>
-              <span className="muted">Next: {m.daysUntil ?? "—"}d</span>
+              <span className="muted">Next: {m.daysUntil ?? "-"}d</span>
               <span className="badge badge-purple">{m.surgeScore}</span>
             </div>
           ))}
           <h4 className="label" style={{ marginTop: 20 }}>Tools Available</h4>
-          {["getUpcomingMatches", "getCrowdForecast", "getBusinessProfile", "generateAlert", "translateAlert"].map((t) => (
+          {["getBusinessProfile", "getUpcomingMatches", "getCrowdForecast", "saveAlert", "generatePlan"].map((t) => (
             <div key={t} className="mono tool-row"><span className="tool-dot" /> {t}</div>
           ))}
         </aside>
@@ -99,7 +100,7 @@ export default function AgentPage() {
               <div key={i} className={m.role === "user" ? "msg-user" : "msg-agent"}>
                 {m.reasoningSteps?.map((step, j) => (
                   <div key={j} className="mono reasoning-line">
-                    ▸ {step.text} {step.status === "done" ? "✓" : "…"}
+                    {step.text} {step.status === "done" ? "done" : "..."}
                   </div>
                 ))}
                 <div className={m.role === "user" ? "user-pill" : "agent-text"}>
@@ -112,14 +113,13 @@ export default function AgentPage() {
             <div ref={bottomRef} />
           </div>
           <form className="chat-input" onSubmit={send}>
-            <span>⚡</span>
             <input
               className="input"
               placeholder="Ask SurgeMind anything about your upcoming surges..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
             />
-            <button type="submit" className="btn btn-primary btn-sm" disabled={sending}>→</button>
+            <button type="submit" className="btn btn-primary btn-sm" disabled={sending}>Send</button>
           </form>
         </section>
 
@@ -128,13 +128,13 @@ export default function AgentPage() {
           <span className="badge" style={{ background: "var(--red)", color: "white" }}>LIVE</span>
           {monitoring.map((m) => (
             <div key={m.city} className="feed-item mono">
-              {m.city}: {m.nextMatch?.teams?.join(" vs ") || "—"} · {m.nextMatch?.expectedCrowd?.toLocaleString() || 0} crowd
+              {m.city}: {m.nextMatch?.teams?.join(" vs ") || "-"} - {m.nextMatch?.expectedCrowd?.toLocaleString() || 0} crowd
             </div>
           ))}
           <h4 className="label" style={{ marginTop: 20 }}>Recent Tool Calls</h4>
           {(session?.toolCalls || []).slice(-5).map((tc, i) => (
             <div key={i} className="mono feed-log">
-              [{new Date(tc.at).toLocaleTimeString()}] {tc.tool}{tc.args} → {tc.result}
+              [{new Date(tc.at).toLocaleTimeString()}] {tc.tool}{tc.args} -> {tc.result}
             </div>
           ))}
           <div className="agent-stats">

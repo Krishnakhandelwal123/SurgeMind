@@ -9,6 +9,7 @@ const TABS = ["Profile", "Business", "Notifications", "Plan & Billing"];
 export default function SettingsPage() {
   const { user, business, refreshUser } = useAuth();
   const [tab, setTab] = useState(0);
+  const [cities, setCities] = useState([]);
   const [name, setName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "");
   const [bizForm, setBizForm] = useState({
@@ -16,11 +17,19 @@ export default function SettingsPage() {
     type: business?.type || "restaurant",
     city: business?.city || "",
     monitoredCities: business?.monitoredCities || [],
+    language: business?.language || "en",
+    dailyCapacity: business?.dailyCapacity || 120,
+    staffCount: business?.staffCount || 8,
+    averageTicket: business?.averageTicket || 28,
+    operatingHours: business?.operatingHours || "10:00 AM - 10:00 PM",
+    topProducts: business?.topProducts?.join(", ") || "",
+    alertLeadTimeDays: business?.alertLeadTimeDays || 7,
   });
   const [notif, setNotif] = useState(null);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
+    authApi.cities().then((r) => setCities(r.data)).catch(() => {});
     settingsApi.notifications().then((r) => setNotif(r.data)).catch(() => {});
   }, []);
 
@@ -31,6 +40,13 @@ export default function SettingsPage() {
         type: business.type,
         city: business.city,
         monitoredCities: business.monitoredCities || [business.city],
+        language: business.language || "en",
+        dailyCapacity: business.dailyCapacity || 120,
+        staffCount: business.staffCount || 8,
+        averageTicket: business.averageTicket || 28,
+        operatingHours: business.operatingHours || "10:00 AM - 10:00 PM",
+        topProducts: business.topProducts?.join(", ") || "",
+        alertLeadTimeDays: business.alertLeadTimeDays || 7,
       });
     }
   }, [business]);
@@ -43,7 +59,18 @@ export default function SettingsPage() {
   };
 
   const saveBusiness = async () => {
-    await businessApi.update(bizForm);
+    await businessApi.update({
+      ...bizForm,
+      dailyCapacity: Number(bizForm.dailyCapacity),
+      staffCount: Number(bizForm.staffCount),
+      averageTicket: Number(bizForm.averageTicket),
+      alertLeadTimeDays: Number(bizForm.alertLeadTimeDays),
+      topProducts: String(bizForm.topProducts || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+      monitoredCities: [bizForm.city],
+    });
     await refreshUser();
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -95,7 +122,46 @@ export default function SettingsPage() {
                 {BUSINESS_TYPES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
               </select>
               <label className="label" style={{ marginTop: 16 }}>Primary city</label>
-              <input className="input" value={bizForm.city} onChange={(e) => setBizForm({ ...bizForm, city: e.target.value })} />
+              <select
+                className="select"
+                value={bizForm.city}
+                onChange={(e) => setBizForm({ ...bizForm, city: e.target.value, monitoredCities: [e.target.value] })}
+              >
+                {(cities.length ? cities : [bizForm.city]).filter(Boolean).map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              <label className="label" style={{ marginTop: 16 }}>Preferred language</label>
+              <select className="select" value={bizForm.language} onChange={(e) => setBizForm({ ...bizForm, language: e.target.value })}>
+                <option value="en">English</option>
+                <option value="es">Spanish</option>
+                <option value="fr">French</option>
+              </select>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginTop: 16 }}>
+                <label>
+                  <span className="label">Daily capacity</span>
+                  <input className="input" type="number" min="1" value={bizForm.dailyCapacity} onChange={(e) => setBizForm({ ...bizForm, dailyCapacity: e.target.value })} />
+                </label>
+                <label>
+                  <span className="label">Staff count</span>
+                  <input className="input" type="number" min="1" value={bizForm.staffCount} onChange={(e) => setBizForm({ ...bizForm, staffCount: e.target.value })} />
+                </label>
+                <label>
+                  <span className="label">Average ticket</span>
+                  <input className="input" type="number" min="1" value={bizForm.averageTicket} onChange={(e) => setBizForm({ ...bizForm, averageTicket: e.target.value })} />
+                </label>
+              </div>
+              <label className="label" style={{ marginTop: 16 }}>Operating hours</label>
+              <input className="input" value={bizForm.operatingHours} onChange={(e) => setBizForm({ ...bizForm, operatingHours: e.target.value })} />
+              <label className="label" style={{ marginTop: 16 }}>Top products or services</label>
+              <input className="input" value={bizForm.topProducts} onChange={(e) => setBizForm({ ...bizForm, topProducts: e.target.value })} />
+              <label className="label" style={{ marginTop: 16 }}>Alert lead time</label>
+              <select className="select" value={bizForm.alertLeadTimeDays} onChange={(e) => setBizForm({ ...bizForm, alertLeadTimeDays: e.target.value })}>
+                <option value="7">7 days before</option>
+                <option value="10">10 days before</option>
+                <option value="14">14 days before</option>
+                <option value="21">21 days before</option>
+              </select>
               <p className="muted" style={{ marginTop: 16 }}>Monitored cities ({user?.plan === "pro" ? 3 : 1} max on {user?.plan} plan)</p>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
                 {bizForm.monitoredCities.map((c) => (
@@ -137,23 +203,23 @@ export default function SettingsPage() {
               <h3>Plan & Billing</h3>
               <div className="card" style={{ background: "var(--surface-2)", marginTop: 16 }}>
                 <strong>Current: {user?.plan === "pro" ? "SurgeMind Pro" : "Free"}</strong>
-                <p className="muted">{user?.plan === "pro" ? "3 cities · all alert types" : "1 business · 1 city · Basic alerts"}</p>
+                <p className="muted">{user?.plan === "pro" ? "3 cities / all alert types" : "1 business / 1 city / basic alerts"}</p>
               </div>
               {user?.plan !== "pro" && (
                 <div className="card" style={{ marginTop: 16, border: "2px solid var(--purple)", background: "rgba(124,110,250,0.08)" }}>
-                  <h3>SurgeMind Pro — $29/month</h3>
+                  <h3>SurgeMind Pro - $29/month</h3>
                   <ul style={{ color: "var(--text-muted)", lineHeight: 2 }}>
-                    <li>✓ 3 monitored cities</li>
-                    <li>✓ All alert types including PRICE_ADJUST</li>
-                    <li>✓ Priority AI agent</li>
+                    <li>3 monitored cities</li>
+                    <li>All alert types including PRICE_ADJUST</li>
+                    <li>Priority AI agent</li>
                   </ul>
-                  <button type="button" className="btn btn-primary" style={{ marginTop: 16 }}>Upgrade Now →</button>
+                  <button type="button" className="btn btn-primary" style={{ marginTop: 16 }}>Upgrade Now</button>
                 </div>
               )}
             </>
           )}
 
-          {saved && <p style={{ color: "var(--teal)", marginTop: 16 }}>✓ Saved</p>}
+          {saved && <p style={{ color: "var(--teal)", marginTop: 16 }}>Saved</p>}
         </div>
       </div>
     </>

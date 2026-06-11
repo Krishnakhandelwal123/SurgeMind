@@ -1,10 +1,13 @@
 import axios from "axios";
 
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:3001";
+const API_BASE =
+  process.env.REACT_APP_API_URL ||
+  (process.env.NODE_ENV === "production" ? "" : "http://localhost:3001");
 
 const api = axios.create({
   baseURL: API_BASE,
   headers: { "Content-Type": "application/json" },
+  withCredentials: true,
 });
 
 api.interceptors.request.use((config) => {
@@ -16,6 +19,7 @@ api.interceptors.request.use((config) => {
 export const authApi = {
   register: (data) => api.post("/api/auth/register", data),
   login: (data) => api.post("/api/auth/login", data),
+  logout: () => api.post("/api/auth/logout"),
   me: () => api.get("/api/auth/me"),
   cities: () => api.get("/api/auth/cities"),
   onboarding: (data) => api.patch("/api/auth/onboarding", data),

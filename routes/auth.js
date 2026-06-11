@@ -2,38 +2,95 @@ const express = require("express");
 const router = express.Router();
 const User = require("../db/models/User");
 const Business = require("../db/models/Business");
-const { signToken, requireAuth } = require("../middleware/auth");
+const {
+  signToken,
+  requireAuth,
+  setAuthCookie,
+  clearAuthCookie,
+} = require("../middleware/auth");
 
 const FIFA_CITIES = [
-  "Atlanta", "Boston", "Dallas", "Houston", "Kansas City", "Los Angeles",
-  "Miami", "New York", "Philadelphia", "San Francisco", "Seattle",
-  "Arlington", "East Rutherford", "Foxborough", "Inglewood", "Santa Clara",
+  "Atlanta", "Boston", "Dallas", "Guadalajara", "Houston", "Kansas City",
+  "Los Angeles", "Mexico City", "Miami", "Monterrey", "New York/New Jersey",
+  "Philadelphia", "San Francisco Bay Area", "Seattle", "Toronto", "Vancouver",
 ];
 
 router.get("/cities", (_req, res) => {
   res.json(FIFA_CITIES);
 });
 
-router.post("/register", async (req, res) => {
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+function validateEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function validatePassword(password) {
+  return (
+    typeof password === "string" &&
+    password.length >= 10 &&
+    /[a-zA-Z]/.test(password) &&
+    /\d/.test(password)
+  );
+}
+
+const authAttempts = new Map();
+
+function authRateLimit(req, res, next) {
+  const key = req.ip || req.headers["x-forwarded-for"] || "unknown";
+  const now = Date.now();
+  const windowMs = 15 * 60 * 1000;
+  const maxAttempts = 20;
+  const record = authAttempts.get(key) || { count: 0, resetAt: now + windowMs };
+
+  if (record.resetAt <= now) {
+    record.count = 0;
+    record.resetAt = now + windowMs;
+  }
+
+  record.count += 1;
+  authAttempts.set(key, record);
+
+  if (record.count > maxAttempts) {
+    return res.status(429).json({ error: "Too many attempts. Try again later." });
+  }
+
+  next();
+}
+
+router.post("/register", authRateLimit, async (req, res) => {
   try {
-    const { businessName, name, email, password, businessType, city, language } = req.body;
+    const { businessName, name, password, businessType, city, language } = req.body;
+    const email = normalizeEmail(req.body.email);
     if (!businessName || !name || !email || !password || !businessType || !city) {
       return res.status(400).json({ error: "All required fields must be provided" });
     }
-    const existing = await User.findOne({ email: email.toLowerCase() });
+    if (!validateEmail(email)) {
+      return res.status(400).json({ error: "Enter a valid email address" });
+    }
+    if (!validatePassword(password)) {
+      return res.status(400).json({ error: "Password must be at least 10 characters and include a letter and number" });
+    }
+    if (!FIFA_CITIES.includes(city)) {
+      return res.status(400).json({ error: "Choose a supported FIFA 2026 city" });
+    }
+
+    const existing = await User.findOne({ email });
     if (existing) {
       return res.status(409).json({ error: "Email already registered" });
     }
 
     const user = await User.create({
-      name,
+      name: String(name).trim(),
       email,
       password,
       onboardingComplete: false,
     });
 
     const business = await Business.create({
-      name: businessName,
+      name: String(businessName).trim(),
       type: businessType,
       city,
       language: language || "en",
@@ -45,6 +102,7 @@ router.post("/register", async (req, res) => {
     await user.save();
 
     const token = signToken(user._id);
+    setAuthCookie(res, token);
     res.status(201).json({
       token,
       user: { ...user.toJSON(), business },
@@ -55,10 +113,15 @@ router.post("/register", async (req, res) => {
   }
 });
 
-router.post("/login", async (req, res) => {
+router.post("/login", authRateLimit, async (req, res) => {
   try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email: email?.toLowerCase() });
+    const email = normalizeEmail(req.body.email);
+    const { password } = req.body;
+    if (!validateEmail(email) || !password) {
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    const user = await User.findOne({ email });
     if (!user || !(await user.comparePassword(password))) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
@@ -66,10 +129,16 @@ router.post("/login", async (req, res) => {
       ? await Business.findById(user.businessId)
       : null;
     const token = signToken(user._id);
+    setAuthCookie(res, token);
     res.json({ token, user: { ...user.toJSON(), business } });
   } catch (err) {
     res.status(500).json({ error: "Login failed" });
   }
+});
+
+router.post("/logout", (_req, res) => {
+  clearAuthCookie(res);
+  res.json({ ok: true });
 });
 
 router.get("/me", requireAuth, async (req, res) => {
@@ -80,13 +149,37 @@ router.get("/me", requireAuth, async (req, res) => {
 
 router.patch("/onboarding", requireAuth, async (req, res) => {
   try {
-    const { step, businessName, businessType, city, language, monitoredCities } = req.body;
+    const {
+      step,
+      businessName,
+      businessType,
+      city,
+      language,
+      monitoredCities,
+      dailyCapacity,
+      staffCount,
+      averageTicket,
+      operatingHours,
+      topProducts,
+      alertLeadTimeDays,
+    } = req.body;
 
     if (req.business) {
-      if (businessName) req.business.name = businessName;
+      if (businessName) req.business.name = String(businessName).trim();
       if (businessType) req.business.type = businessType;
       if (city) req.business.city = city;
       if (language) req.business.language = language;
+      if (dailyCapacity !== undefined) req.business.dailyCapacity = Number(dailyCapacity);
+      if (staffCount !== undefined) req.business.staffCount = Number(staffCount);
+      if (averageTicket !== undefined) req.business.averageTicket = Number(averageTicket);
+      if (operatingHours) req.business.operatingHours = String(operatingHours).trim();
+      if (alertLeadTimeDays !== undefined) req.business.alertLeadTimeDays = Number(alertLeadTimeDays);
+      if (Array.isArray(topProducts)) {
+        req.business.topProducts = topProducts
+          .map((item) => String(item).trim())
+          .filter(Boolean)
+          .slice(0, 8);
+      }
       if (monitoredCities?.length) {
         const max = req.user.plan === "pro" ? 3 : 1;
         req.business.monitoredCities = monitoredCities.slice(0, max);
@@ -128,8 +221,21 @@ router.patch("/onboarding", requireAuth, async (req, res) => {
 router.patch("/profile", requireAuth, async (req, res) => {
   try {
     const { name, email } = req.body;
-    if (name) req.user.name = name;
-    if (email) req.user.email = email.toLowerCase();
+    if (name) req.user.name = String(name).trim();
+    if (email) {
+      const normalizedEmail = normalizeEmail(email);
+      if (!validateEmail(normalizedEmail)) {
+        return res.status(400).json({ error: "Enter a valid email address" });
+      }
+      const existing = await User.findOne({
+        email: normalizedEmail,
+        _id: { $ne: req.user._id },
+      });
+      if (existing) {
+        return res.status(409).json({ error: "Email already registered" });
+      }
+      req.user.email = normalizedEmail;
+    }
     await req.user.save();
     res.json({ user: { ...req.user.toJSON(), business: req.business } });
   } catch (err) {

@@ -1,19 +1,50 @@
 .onboard { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 32px; }
-.onboard-card { max-width: 520px; width: 100%; text-align: center; }
-.dots { display: flex; gap: 8px; justify-content: center; margin-bottom: 32px; }
-.dots span { width: 10px; height: 10px; border-radius: 50%; background: var(--surface-3); }
-.dots span.filled { background: var(--purple); }
-.onboard-icon { font-size: 48px; margin-bottom: 16px; }
+.onboard-card { max-width: 760px; width: 100%; text-align: center; }
+.onboard-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  border: 1px solid rgba(212,175,55,0.35);
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gold);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 1px;
+  background: rgba(212,175,55,0.08);
+}
 .onboard-icon.glow { box-shadow: 0 0 40px #7C6EFA44; border-radius: 50%; width: 80px; height: 80px; display: inline-flex; align-items: center; justify-content: center; }
 .muted { color: var(--text-muted); }
 .type-grid, .lang-grid { display: grid; gap: 12px; margin-top: 24px; text-align: left; }
 .type-grid { grid-template-columns: repeat(2, 1fr); }
 .lang-grid { grid-template-columns: 1fr; }
+.profile-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 24px; text-align: left; }
+.profile-grid label { color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+.profile-grid .input, .profile-grid .select { margin-top: 6px; }
+.profile-grid .wide { grid-column: 1 / -1; }
 .type-card, .lang-card {
   padding: 16px; background: var(--surface-2); border: 1px solid var(--border);
   border-radius: var(--radius-md); cursor: pointer; color: var(--text);
 }
+.type-card { display: flex; justify-content: space-between; align-items: center; }
+.type-card small { color: var(--text-dim); }
 .lang-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .type-card.active, .lang-card.active { border-color: var(--purple); background: rgba(124,110,250,0.1); }
 .progress-bar { height: 8px; background: var(--surface-3); border-radius: 4px; margin-top: 24px; overflow: hidden; }
 .progress-fill { height: 100%; background: linear-gradient(90deg, var(--purple), var(--teal)); transition: width 0.2s; }
+.onboard-error {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(225,75,100,0.45);
+  border-radius: 8px;
+  background: rgba(225,75,100,0.12);
+  color: var(--red);
+  text-align: left;
+  font-size: 14px;
+}
+@media (max-width: 720px) {
+  .type-grid, .profile-grid { grid-template-columns: 1fr; }
+  .onboard { padding: 16px; }
+}
